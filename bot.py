@@ -1,38 +1,50 @@
-import talib
-import pandas as pd
-import yfinance as yf
-import datetime
+from data_functions import RSI
+import logging
+import schedule
+import time
 
 
-def historical_prices(stock_code, start_date, end_date, show=False):
-    data = yf.download(stock_code, start=start_date, end=end_date)
-    if show:
-        print(data)
-    return data
+# Logging setup
+logging.basicConfig(level=logging.INFO)
 
 
-def trading_bot(stock_code, rsi_period=14, adx_period=14):
-    #settings
-    pd.set_option('display.max_rows', None)
+# trading_bot
+def trading_bot(ticker, interval):
+    RSI(ticker=ticker,interval=interval)
 
-    today_date = datetime.datetime.now().strftime('%Y-%m-%d')
-    data = historical_prices(stock_code, '2022-01-01', today_date)
+def start_new_bot(ticker, interval):
+    schedule.clear()
+    if interval == "1m":
+        seconds = 60
+    elif interval == "2m":
+        seconds = 120
+    elif interval == "5m":
+        seconds = 300
+    elif interval == "15m":
+        seconds = 900
+    elif interval == "30m":
+        seconds = 1800
+    elif interval == "1h":
+        seconds = 3600
+    elif interval == "1d":
+        seconds = 86400
+    elif interval == "5d":
+        seconds = 432000
+    elif interval == "1wk":
+        seconds = 604800
+    elif interval == "1mo":
+        seconds = 2592000
+    elif interval == "3mo":
+        seconds = 7776000
+    else:
+        raise ValueError("Neplatný interval: {}".format(interval))
 
-    #indicators
-    data['RSI'] = talib.RSI(data['Close'], timeperiod=rsi_period)
-    data['ADX'] = talib.ADX(data['High'], data['Low'], data['Close'], timeperiod=adx_period)
-    data['DI+'] = talib.PLUS_DI(data['High'], data['Low'], data['Close'], timeperiod=adx_period)
-    data['DI-'] = talib.MINUS_DI(data['High'], data['Low'], data['Close'], timeperiod=adx_period)
-
-    #remove NaN
-    data = data.dropna()
-
-    #trading conditions
-    data['Trade'] = 'HOLD'
-    data.loc[(data['ADX'] > 25) & (data['DI+'] > data['DI-']) & (data['RSI'] < 30), 'Trade'] = 'Buy'
-    data.loc[(data['ADX'] > 25) & (data['DI-'] > data['DI+']) & (data['RSI'] > 70), 'Trade'] = 'Sell'
-
-    print(data)
+    schedule.every(seconds).seconds.do(trading_bot, ticker, interval)
+    print("New bot running")
 
 
-trading_bot('TSLA')
+start_new_bot("TSLA", "5m")
+
+while True:
+    schedule.run_pending()
+    time.sleep(1)
